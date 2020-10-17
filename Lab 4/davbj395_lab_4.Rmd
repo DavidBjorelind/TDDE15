@@ -1,0 +1,37 @@
+---
+title: "Lab 4 - Gaussian Processes"
+author: "David Björelind"
+date: "10/18/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+```
+
+
+## 2.1) Implementing GP Regression
+```{r}
+
+```
+
+## 2.2) GP Regression with kernlab
+```{r}
+
+# Simulating from posterior distribution of f
+posteriorGP = function(X, y, XStar, sigmaNoise, k = SquaredExpKernel()){
+  
+  
+  # Returns a vector with the posterior mean and variance
+  return(1)
+}
+
+```
+
+
+## Another chunk
+```{r}
+# Another chunk
+
+```
