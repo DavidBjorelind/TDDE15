@@ -8,6 +8,9 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
 # Include packages here
+library(kernlab)
+library(AtmRay)
+
 # Covariance function
 SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
   n1 <- length(x1)
@@ -34,7 +37,7 @@ posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){
   
   FStar = t(kStar) %*% alpha
   v = solve(L, kStar)
-  vf = k(XStar, XStar, sigmaF, l) - t(v)%*%v + sigmaNoise*diag(n) #Adding sigma for noise
+  vf = k(XStar, XStar, sigmaF, l) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
   #print(k(XStar, XStar, sigmaF, l))
   #print(diag(t(v)%*%v))
   logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
@@ -92,7 +95,7 @@ lines(x = xrange, y = res$mean - sqrt(diag(res$variance))*1.96, col="blue",  typ
 # (5)
 x = c(-1.0, -0.6, -0.2, 0.4, 0.8) 
 y = c(0.768, -0.044, -0.940, 0.719, -0.664)
-sigmaf = 1^2
+sigmaf = 1
 l = 1
 res = posteriorGP(x, y, xrange, sigman, SquaredExpKernel, sigmaF = sigmaf, l=l)
 
@@ -105,14 +108,146 @@ Since **l=1**, the produced function will be more smooth compared to (4). We als
 
 ## 2.2 (1) GP Regression with kernlab
 ```{r, include=FALSE}
-read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/TempTullinge.csv", header=TRUE, sep=";")
-time = 1
+temps = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/TempTullinge.csv", header=TRUE, sep=";")$temp
+time = seq(from=1, to=2190, by=5)
+temps = temps[time]
+day = rep(seq(from=1, to=361, by=5), times=6)
 ```
 
-## 2.2 (2)
+## 2.2 (1)
 ```{r}
-# (3)
 
+SEKernel = function(x1, x2, ell = 1, sigmaf = 1){
+  r = sqrt(sum((x1 - x2)^2))
+  return(sigmaf^2*exp(-r^2/(2*ell^2)))
+}
+
+kernel = SEKernel(x1=1, x2=2, ell = l, sigmaf = sigmaf)
+
+X = c(1,3,4)
+XStar = c(2,3,4)
+covarmatrix = kernelMatrix(kernel = SEKernel, x=X, y=XStar)
+
+newKernelMatrix = function(kernel, x, y){
+  SEKernel = function(x1, x2, ell = 1, sigmaf = 1){
+    r = sqrt(sum((x1 - x2)^2))
+    return(sigmaf*exp(-r^2/(2*ell^2)))
+  }
+  return(covarmatrix = kernelMatrix(kernel = SEKernel, x=x, y=y))
+}
+SEKernelfunc = function(ell, sigmaf){
+  
+  kernel = function(x1, x2){
+  r = sqrt(sum((x1 - x2)^2))
+  return(sigmaf^2*exp(-r^2/(2*ell^2)))
+  }
+  class(kernel) <- "kernel"
+  return(kernel)
+}
+
+```
+
+
+##2.2 (2)
+```{r}
+ell = 0.2
+sigmaf = 20
+
+# Getting the error term for the GP
+polyFit <- lm(temps ~  time + I(time^2))
+sigma = sd(polyFit$residuals)
+GPfit = gausspr(x=time, y=temps, kernel = SEKernelfunc(ell, sigmaf), var = sigma^2, type="regression")
+meanpred = predict(GPfit, time)
+
+# Plotting the means!
+plot(time, meanpred, col="red", type='l')
+
+```
+A higher value for ell increases smoothness.
+A higher value for sigmaf increases the possible ranges of the predicted means. A lower value gives lower covariance between prediction. This explains the difference in the highest and lowest values for different sigmaf's.
+
+##2.2 (3)
+```{r}
+# Modified posteriorGP function
+posteriorGP = function(X, y, XStar, sigmaNoise, k){
+  K = kernelMatrix(k,X,X)
+  n = length(XStar)
+  L = t(chol(K + sigmaNoise*diag(dim(K)[1])))
+  kStar = kernelMatrix(k,X,XStar)
+  alpha = solve(t(L), solve(L,y))
+  FStar = (t(kStar)) %*% alpha
+  v = solve(L, kStar)
+  vf = kernelMatrix(k,XStar, XStar) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
+  logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
+  
+  # Returns a vector with the posterior mean and variance
+  return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
+}
+
+var = posteriorGP(X=scale(time), y=scale(temps), XStar=scale(time), sigmaNoise=sigma^2, k=SEKernelfunc(ell, sigmaf))
+varr = sqrt(var$variance)*sd(temps)
+
+plot(time, meanpred, col="red", type='l', ylim=c(-25,25), main="Plot with means from time and 95% interval")
+lines(x = time, y = meanpred + sqrt(diag(var$variance)*1.96*sd(temps)), col="blue", type="l")
+lines(x = time, y = meanpred - sqrt(diag(var$variance)*1.96*sd(temps)), col="blue",  type="l")
+lines(x = time, y = temps,  type="p")
+```
+
+##2.2 (4)
+```{r}
+ell = 0.2
+sigmaf = 20
+
+# Getting the error term for the GP, using day instead of time
+polyFit <- lm(temps ~  day + I(day^2))
+sigma = sd(polyFit$residuals)
+GPfit = gausspr(x=day, y=temps, kernel = SEKernelfunc(ell, sigmaf), var = sigma^2, type="regression")
+meanpred_day = predict(GPfit, day)
+
+plot(time, meanpred, col="red", type='l', ylim=c(-25,30), main="Plot with predictions from day (red:time, green:day)")
+lines(x = time, y = meanpred_day + sqrt(diag(var$variance)*1.96*sd(temps)), col="blue", type="l")
+lines(x = time, y = meanpred_day - sqrt(diag(var$variance)*1.96*sd(temps)), col="blue",  type="l")
+lines(x = time, y = temps,  type="p")
+lines(x = time, y = meanpred_day, col="green",  type="l")
+
+```
+
+##2.2 (5)
+```{r}
+periodickernelfunc = function(sigmaf, l1, l2, d){
+  periodicKernel = function(x1, x2){
+  r = sqrt(sum((x1 - x2)^2))
+  one = exp(-2*sin(r/d)/l1^2)
+  two = exp(-r^2/(2*l2^2))
+  return(sigmaf^2*one*two)
+  }
+  class(periodicKernel) <- "kernel"
+  return(periodicKernel)
+}
+
+# Hyperparameters
+sigmaf = 20
+l1 = 1
+l2 = 10
+d = 365/sd(time)
+
+# Getting the error term for the GP # USING TIME MAYBE CHANGE
+polyFit <- lm(temps ~  time + I(time^2))
+sigma = sd(polyFit$residuals)
+GPfit = gausspr(x=time, y=temps, kernel = periodickernelfunc(sigmaf, l1, l2, d), var = sigma^2, type="regression")
+meanpred_5 = predict(GPfit, time)
+
+# Plotting the means!
+plot(x = time, y = meanpred_5, col="red", type='l', ylim=c(-25,25),main = "Means using the periodic kernel")
+lines(x = time, y = meanpred_5 + sqrt(diag(var$variance)*1.96*sd(temps)), col="blue", type="l")
+lines(x = time, y = meanpred_5 - sqrt(diag(var$variance)*1.96*sd(temps)), col="blue",  type="l")
+lines(x = time, y = temps,  type="p")
+```
+We can see that the periodic kernel produces produces more sharp "valleys" and more even "tops" compared to the more smooth Squared Exponential kernel.
+
+##2.3 (1)
+```{r}
+#data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",") names(data) <- c("varWave","skewWave","kurtWave","entropyWave","fraud") data[,5] <- as.factor(data[,5])
 
 ```
 
@@ -120,12 +255,10 @@ time = 1
 ```{r}
 # (3)
 
-
 ```
 
 ## Another chunk
 ```{r}
 # (3)
-
 
 ```
