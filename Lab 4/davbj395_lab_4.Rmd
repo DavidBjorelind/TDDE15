@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
 # Include packages here
 library(kernlab)
 library(AtmRay)
-
 # Covariance function
 SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
   n1 <- length(x1)
@@ -23,21 +22,21 @@ SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
 }
 ```
 
-# Assignment 1
-## 2.1) (1) Implementing GP Regression
+# Assignment 1 - Implementing GP Regression
+## 2.1) (1)
 ```{r}
 # Simulating from posterior distribution of f
 posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){
   
-  K = k(X,X, sigmaF, l)
+  K = k(X,X, sigmaF^2, l)
   n = length(XStar)
-  L = t(chol(K + sigmaNoise*diag(dim(K)[1])))
-  kStar = k(X,XStar, sigmaF, l)
+  L = t(chol(K + sigmaNoise^2*diag(dim(K)[1])))
+  kStar = k(X,XStar, sigmaF^2, l)
   alpha = solve(t(L), solve(L,y))
   
   FStar = t(kStar) %*% alpha
   v = solve(L, kStar)
-  vf = k(XStar, XStar, sigmaF, l) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
+  vf = k(XStar, XStar, sigmaF^2, l) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
   logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
   # Returns a vector with the posterior mean and variance
   return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
@@ -46,9 +45,9 @@ posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){
 
 ## 2.1) (2) GP Regression with kernlab
 ```{r}
-sigmaf = 1^2
-sigman = 0.1^2
-l = 0.3
+sigmaf = 1 # 1
+sigman = 0.1 # 0.1
+l = 0.3 # 0.3
 x = 0.4
 y = 0.719
 xrange = seq(-1,1, length=25)
@@ -79,7 +78,7 @@ lines(x = xrange, y = res$mean - sqrt(diag(res$variance))*1.96, col="blue",  typ
 # (4)
 x = c(-1.0, -0.6, -0.2, 0.4, 0.8) 
 y = c(0.768, -0.044, -0.940, 0.719, -0.664)
-sigmaf = 1^2
+sigmaf = 1
 l = 0.3
 res = posteriorGP(x, y, xrange, sigman, SquaredExpKernel, sigmaF = sigmaf, l=l)
 plot(x = xrange, y = res$mean, ylim = c(-2,2), main = "Updating mean with 5 observations")
@@ -95,14 +94,16 @@ sigmaf = 1
 l = 1
 res = posteriorGP(x, y, xrange, sigman, SquaredExpKernel, sigmaF = sigmaf, l=l)
 
-plot(x = xrange, y = res$mean, ylim = c(-3,2), main = "Updating mean with 5 observations and l=1")
+plot(x = xrange, y = res$mean, ylim = c(-3,2), main = "Updating mean with 5 observations and l=1", type="l")
 lines(x = xrange, y = res$mean + sqrt(diag(res$variance))*1.96, col="blue", type="l")
 lines(x = xrange, y = res$mean - sqrt(diag(res$variance))*1.96, col="blue",  type="l")
+lines(x = x, y = y, col="red",  type="p")
 ```
-Since **l=1**, the produced function will be more smooth compared to (4). We also see that the bands created are much more narrow compared to plot produced in (4).
+When **l=1**, the produced function will be more smooth compared to (4). We also see that the bands created are much more narrow compared to plot produced in (4). This is underfitting of the data. A high value for **l** allows for a lower space between the probability bands. This means that we have to move further in other to get a change in correlation than with a small **l**.
 
-# Assignment 2
-## 2.2 (1) GP Regression with kernlab
+
+# Assignment 2 - GP Regression with kernlab
+## 2.2 (1)
 ```{r, include=FALSE}
 temps = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/TempTullinge.csv", header=TRUE, sep=";")$temp
 ```
@@ -150,74 +151,78 @@ SEKernelfunc = function(ell, sigmaf){
 
 ## 2.2 (2)
 ```{r}
-ell = 0.2
+ell = 0.3
 sigmaf = 20
 
 # Getting the error term for the GP
-polyFit <- lm(temps ~  time_s + I(time_s^2))
+polyFit <- lm(temps_s ~  time_s + I(time_s^2))
 sigma = sd(polyFit$residuals)
 GPfit = gausspr(x=time_s, y=temps_s, kernel = SEKernelfunc(ell, sigmaf), var = sigma^2, type="regression")
 meanpred = predict(GPfit, time_s)
 
 # Plotting the means from time data
-plot(time, meanpred*tempssd+tempsmean, col="red", type='l', ylab="Temp", main="Time mean")
+plot(x = time, y = meanpred*tempssd+tempsmean, col="red", type='l', ylab="Temp", main="Time mean")
 lines(x = time, y = temps,  type="p")
 
 ```
-A higher value for ell increases smoothness.
-A higher value for sigmaf increases the possible ranges of the predicted means. A lower value gives lower covariance between prediction. This explains the difference in the highest and lowest values for different sigmaf's.
+A higher value for ell increases smoothness. A higher value for sigmaf increases the possible ranges of the predicted means. A lower value gives lower covariance between prediction. This explains the difference in the highest and lowest values for different sigmafs. Judging from the mean we can seen it misses values in the highs and in the lows.
 
-## 2.2 (3)
+## 2.2 (3) Probability bands
 ```{r}
 # Modified posteriorGP function
 posteriorGP = function(X, y, XStar, sigmaNoise, k){
   K = kernelMatrix(k,X,X)
   n = length(XStar)
-  L = t(chol(K + sigmaNoise*diag(dim(K)[1])))
+  L = t(chol(K + sigmaNoise^2*diag(dim(K)[1])))
   kStar = kernelMatrix(k,X,XStar)
   alpha = solve(t(L), solve(L,y))
   FStar = (t(kStar)) %*% alpha
   v = solve(L, kStar)
-  vf = kernelMatrix(k,XStar, XStar) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
+  vf = kernelMatrix(k,XStar, XStar) - t(v)%*%v #+ sigmaNoise^2*diag(n) #Adding sigma for noise
   logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
   
   # Returns a vector with the posterior mean and variance
   return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
 }
 sigmaf = 20
-var = posteriorGP(X=time_s, y=temps_s, XStar=time_s, sigmaNoise=sigma^2, k=SEKernelfunc(ell, sigmaf))
+var = posteriorGP(X=time_s, y=temps_s, XStar=time_s, sigmaNoise=sigma, k=SEKernelfunc(ell, sigmaf))
 
-plot(time, meanpred*tempssd+tempsmean, col="red", type='l', ylim=c(-20,20), main="Plot with means from time and 95% interval (in blue)", ylab="Temp")
-lines(x = time, y = meanpred*tempssd+tempsmean + sqrt(diag(var$variance))*1.96, col="blue", type="l")
-lines(x = time, y = meanpred*tempssd+tempsmean - sqrt(diag(var$variance))*1.96, col="blue",  type="l")
+plot(time, meanpred*tempssd+tempsmean, col="red", type='l', ylim=c(-20,20), main="Plot with means (red) from time model and 95% interval (in blue)", ylab="Temp")
+lines(x = time, y = meanpred*tempssd+tempsmean + sqrt(diag(var$variance))*1.96*tempssd, col="blue", type="l")
+lines(x = time, y = meanpred*tempssd+tempsmean - sqrt(diag(var$variance))*1.96*tempssd, col="blue",  type="l")
 lines(x = time, y = temps,  type="p")
 ```
 
-## 2.2 (4)
+## 2.2 (4) Day model
 ```{r}
 ell = 0.2
 sigmaf = 20
 
 # Getting the error term for the GP, using day instead of time
-polyFit <- lm(temps ~  day_s + I(day_s^2))
+polyFit <- lm(temps_s ~  day_s + I(day_s^2))
 sigma = sd(polyFit$residuals)
 GPfit = gausspr(x=day_s, y=temps_s, kernel = SEKernelfunc(ell, sigmaf), var = sigma^2, type="regression")
 meanpred_day = predict(GPfit, day_s)
 
-plot(time, meanpred*tempssd+tempsmean, col="red", type='l', ylim=c(-20,25), main="Plot with predictions from day (red:time, green:day)", ylab="Temp")
-lines(x = time, y = meanpred*tempssd+tempsmean + sqrt(diag(var$variance))*1.96, col="blue", type="l")
-lines(x = time, y = meanpred*tempssd+tempsmean - sqrt(diag(var$variance))*1.96, col="blue",  type="l")
+plot(time, meanpred_day*tempssd+tempsmean, col="orange", type='l', ylim=c(-20,25), main="Plot with predictions from day model (red:time model, orange:day model)", ylab="Temp", lwd=2)
+#lines(x = time, y = meanpred*tempssd+tempsmean + sqrt(diag(var$variance))*1.96*tempssd, col="blue", type="l")
+#lines(x = time, y = meanpred*tempssd+tempsmean - sqrt(diag(var$variance))*1.96*tempssd, col="blue",  type="l")
 lines(x = time, y = temps,  type="p")
-lines(x = time, y = meanpred_day*tempssd+tempsmean, col="green",  type="l")
-
+lines(x = time, y = meanpred*tempssd+tempsmean, col="red",  type="l", lwd=2) 
 ```
+Pros and cons of each model?
+
+Days: Not smooth when changing year because the model cannot distinguish between different years.
+
+Time: Produces smooth graphs and takes advantage of differences between years. This is seen in the graph where we seem to have an upwards trend.
+
 
 ## 2.2 (5)
 ```{r}
 periodickernelfunc = function(sigmaf, l1, l2, d){
   periodicKernel = function(x1, x2){
   r = sqrt(sum((x1 - x2)^2))
-  one = exp(-2*sin(r/d)/l1^2)
+  one = exp(-2*sin(pi*r/d)^2/l1^2)
   two = exp(-r^2/(2*l2^2))
   return(sigmaf^2*one*two)
   }
@@ -232,28 +237,31 @@ l2 = 10
 d = 365/sd(time)
 
 # Getting the error term for the GP
-polyFit <- lm(temps ~  time_s + I(time_s^2))
+polyFit <- lm(temps_s ~  time_s + I(time_s^2))
 sigma = sd(polyFit$residuals)
 GPfit = gausspr(x=time_s, y=temps_s, kernel = periodickernelfunc(sigmaf, l1, l2, d), var = sigma^2, type="regression")
 meanpred_5 = predict(GPfit, time_s)
 
 # Plotting the means!
 plot(x = time, y = meanpred_5*tempssd+tempsmean, col="red", type='l', ylim=c(-25,25), main = "Means using the periodic kernel", ylab="Temp")
-lines(x = time, y = meanpred_5*tempssd+tempsmean + sqrt(diag(var$variance))*1.96, col="blue", type="l")
-lines(x = time, y = meanpred_5*tempssd+tempsmean - sqrt(diag(var$variance))*1.96, col="blue",  type="l")
+#lines(x = time, y = meanpred_5*tempssd+tempsmean + sqrt(diag(var$variance))*1.96*tempssd, col="blue", type="l")
+#lines(x = time, y = meanpred_5*tempssd+tempsmean - sqrt(diag(var$variance))*1.96*tempssd, col="blue",  type="l")
 lines(x = time, y = temps,  type="p")
 ```
 ## Plot of all the means
 ```{r}
-plot(x = time, y = meanpred*tempssd+tempsmean, col="red", type='l', ylim=c(-15,25),main = "Time against Temperature", ylab="Temp")
-lines(x = time, y = meanpred_day*tempssd+tempsmean, col="green", type='l')
-lines(x = time, y = meanpred_5*tempssd+tempsmean, col="blue", type='l')
-legend("bottomright", legend=c("time mean", "day mean", "periodic mean"), lty=c(1, 1, 1),col=c("red", "green", "blue"))
+plot(x = time, y = meanpred*tempssd+tempsmean, col="red", type='l', ylim=c(-15,25),main = "Time against temperature", ylab="Temp", lwd=2)
+lines(x = time, y = meanpred_day*tempssd+tempsmean, col="green", type='l', lwd=2)
+lines(x = time, y = meanpred_5*tempssd+tempsmean, col="blue", type='l', lwd=2)
+lines(x = time, y = temps, col="black", type='p')
+legend("bottomright", legend=c("time mean", "day mean", "periodic mean", "temp data"), lwd=c(1,1,1,NA),col=c("red", "green", "blue", "black"), pch=c(NA,NA,NA,1))
 ```
 
-We can see that the periodic kernel produces produces more sharp "valleys" and more even "tops" compared to the more smooth Squared Exponential kernel. This can be explained by the use of the periodic kernel. The model now takes into consideration
+We can see that the periodic kernel produces produces more sharp "valleys" and more even "tops" compared to the more smooth Squared Exponential kernel. This can be explained by the use of the periodic kernel. The model now gives higher correlation for data points years forward and backwards. This is due to the periodic nature of the data, which is translated into our model.
 
-# Assignment 3
+Day model captures better extreme values than time model does. One thing in common is that the tops and bottom has the same shape, which is not true for the periodic model. We also see, for the day model, that all the years are repeating. It does not know which year it is on. This makes it so that the model does not capture differences in different years, like the time model does. It can be interpreted as the model does a prediction on a certain date and has access to 6 data point for that date.
+
+# Assignment 3 - GP with classifications
 ## 2.3 (1)
 ```{r}
 data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
@@ -272,7 +280,10 @@ GPfitfraud
 # Predict on the training set
 pred = predict(GPfitfraud,train_data)
 # Confusion matrix
-table(pred, data[SelectTraining,5])
+CM=table(pred, data[SelectTraining,5])
+CM
+# accuracy
+sum(diag(CM))/sum(CM)
 ```
 
 ## Plotting the data
@@ -288,12 +299,9 @@ names(gridPoints) <- names(data)[1:2]
 probPreds <- predict(GPfitfraud, gridPoints, type="probabilities")
 
 # Plotting for Prob(fraud)
-contour(varWave, skewWave, matrix(probPreds[,1], 100, byrow = TRUE), 20, xlab = "varWave", ylab = "skewWave", main = 'Prob(Fraud) - Fraud is red, nonfraud is blue')
+contour(varWave, skewWave, matrix(probPreds[,2], 100, byrow = TRUE), 20, xlab = "varWave", ylab = "skewWave", main = 'Prob(Fraud) - Fraud is red, nonfraud is blue')
 points(train_data[train_data$fraud==1,1], train_data[train_data$fraud==1,2],col="red")
 points(train_data[train_data$fraud==0,1], train_data[train_data$fraud==0,2],col="blue")
-
-
-
 ```
 
 ## 2.3 (2)
@@ -321,6 +329,6 @@ print(conf_new)
 sum(diag(conf_new))/sum(conf_new)
 
 ```
-We can see that accuracy is much higher when using all four covariates. Only two cases were incorrectly classified!
+We can see that accuracy is much higher when using all four covariates when predicting fraud. Only two cases were incorrectly classified! A reason might be that the model has access to more datapoints for each prediction made, which makes it better. 
 
 
