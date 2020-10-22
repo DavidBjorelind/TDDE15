@@ -1,0 +1,36 @@
+---
+title: "exam_XXSX_mysol"
+author: "David Björelind"
+date: "10/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+```
+
+## 1. Graphical Models
+```{r}
+
+```
+
+## 2. Hidden Markov Models
+```{r}
+
+```
+
+## 3. Reinforcement Learning
+```{r}
+
+```
+
+## 4. Gaussian Processes
+```{r}
+
+```
+
+## Another chunk
+```{r}
+
+```

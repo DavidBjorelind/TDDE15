@@ -1,0 +1,129 @@
+---
+title: "exam_2019_mysol"
+author: "David Björelind"
+date: "10/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+library(bnlearn)
+library(gRain)
+```
+
+## 1. Graphical Models
+```{r}
+#C: Car
+#D: Door of choice
+#M: Monty's choice
+
+# Making the network model
+graph = model2network("[D][C][M|C:D]")
+plot(graph)
+
+# Making the Conditional Probability Tables
+cptC = matrix(c(1/3, 1/3, 1/3), ncol = 3, dimnames = list(NULL, c("Car1", "Car2", "Car3")))
+
+cptD = matrix(c(1/3, 1/3, 1/3), ncol = 3, dimnames = list(NULL, c("Choice1", "Choice2", "Choice3")))
+
+cptM = c(0, 0.5, 0.5,
+          0, 0, 1,
+          0, 1, 0,
+          0, 0, 1,
+          0.5, 0, 0.5,
+          1, 0, 0,
+          0, 1, 0,
+          1, 0, 0,
+          0.5, 0.5, 0)
+dim(cptM) = c(3,3,3)
+dimnames(cptM) = list("M" = c("Door1", "Door2", "Door3"), "D" =  c("Choice1", "Choice2", "Choice3"), "C" = c("Car1", "Car2", "Car3"))
+
+dist = list("D" = cptD, "C"= cptC, "M" = cptM) # Largest one needs to be last and names needs to be the same
+parameters = custom.fit(graph, dist = list("D" = cptD, "C"= cptC, "M" = cptM))
+
+### EXAKT INFERENCE ###
+grain = as.grain(parameters)
+structure = compile(grain) # creating junction tree, separators & residuals. Potentials
+goal = c("C")
+evi = setEvidence(structure, nodes = c(""), states = c(""))
+dist = querygrain(evi, nodes = goal)
+# Picking door 1, monty 2
+evi = setEvidence(structure, nodes = c("D", "M"), states = c("Choice1", "Door2"))
+querygrain(evi, nodes = goal)
+# Picking door 3, monty 2
+evi = setEvidence(structure, nodes = c("D", "M"), states = c("Choice3", "Door2"))
+querygrain(evi, nodes = goal)
+
+evi = setEvidence(structure, nodes = c("D", "M"), states = c("Choice1", "Door3"))
+querygrain(evi, nodes = goal)
+
+### APPROXIMATE INFERENCE ###
+
+a = cpdist(fitted = parameters, nodes = "C", evidence = TRUE)
+table(a)/sum(table(a))
+b =  cpdist(fitted = parameters,nodes = "C", evidence = (D=="Choice1" & M=="Door2"))
+table(b)/sum(table(b))
+
+```
+Conclusion: Always switch doors!!
+
+## 1b)
+```{r}
+# Making the network model
+graph = model2network("[B][A][C|A:B]")
+plot(graph)
+
+# Making the Conditional Probability Tables
+cptA = matrix(c(1/2, 1/2), ncol = 2, dimnames = list(NULL, c("A0", "A1")))
+
+cptB = matrix(c(1/2, 1/2), ncol = 2, dimnames = list(NULL, c("B0", "B1")))
+
+cptC = c(1, 0,
+          0, 1,
+          0, 1,
+          1, 0)
+dim(cptC) = c(2,2,2)
+dimnames(cptC) = list("C" = c("C0", "C1"), "A" =  c("A0", "A1"), "B" = c("B0", "B1"))
+
+dist = list("A" = cptA, "B"= cptB, "C" = cptC) # Largest one needs to be last and names needs to be the same
+parameters = custom.fit(graph, dist = list("A" = cptA, "B"= cptB, "C" = cptC))
+niter = 1000
+# Drawing samples
+sample = rbn(parameters, n=niter)
+
+# Learning HC from samples
+learn_graph = hc(sample)
+
+# Repeating 10 times
+for (i in 1:10){
+  sample = rbn(parameters, n=niter)
+  learn_graph = hc(sample)
+  plot(learn_graph)
+}
+
+```
+Why does HC fail to recover the true BN structure in most runs?
+
+
+
+## 2. Hidden Markov Models
+```{r}
+
+```
+
+## 3. Reinforcement Learning
+```{r}
+
+```
+
+## 4. Gaussian Processes
+```{r}
+
+```
+
+## Another chunk
+```{r}
+
+```
+
