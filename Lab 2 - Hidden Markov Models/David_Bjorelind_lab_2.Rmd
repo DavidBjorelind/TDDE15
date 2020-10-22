@@ -20,8 +20,9 @@ This is my personal lab report for lab 2.
 
 ### 1) Build a hidden Markov model (HMM) for the scenario described above
 ```{r, out.width='.49\\linewidth', fig.width=5, fig.height=5,fig.show='hold',fig.align='center'}
-state = rep(1:10)
-probs = rep(0, 10)
+state = rep(1:10) # Actual number of states that the robot can be in (Hidden)
+symbols = 1:11 # States that we can observe (Not hidden)
+probs = rep(0, 10) # 
 probs[1] = 1 # Robot starts in position 1
 
 emissionP = matrix(0, 10, 10)
@@ -43,7 +44,7 @@ for (i in 1:10){
   }  
 }
 
-robot = initHMM(States = state, Symbols = state, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+robot = initHMM(States = states, Symbols = state, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
 ```
 
 
@@ -72,7 +73,7 @@ sum_alphabeta = apply(alpha*beta, 2, sum)
 filter = t(apply(alpha, 1,"/", sum_alpha))
 
 # Smoothed probability distribution (using all available obs)
-smoothing = t(apply(alpha*beta, 1, "/", sum_alphabeta))
+smoothing = t(apply(alpha*beta, 1, "/", sum_alphabeta)) # same thing as posterior(robot, obs)!!!!
 
 # Most probable path, using VITERBI algorithm
 path = viterbi(robot, obs)

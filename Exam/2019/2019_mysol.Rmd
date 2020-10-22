@@ -10,9 +10,12 @@ knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
 # Include packages here
 library(bnlearn)
 library(gRain)
+library(HMM)
+library(kernlab)
 ```
 
 ## 1. Graphical Models
+### a)
 ```{r}
 #C: Car
 #D: Door of choice
@@ -68,7 +71,7 @@ table(b)/sum(table(b))
 ```
 Conclusion: Always switch doors!!
 
-## 1b)
+### b)
 ```{r}
 # Making the network model
 graph = model2network("[B][A][C|A:B]")
@@ -105,25 +108,230 @@ for (i in 1:10){
 ```
 Why does HC fail to recover the true BN structure in most runs?
 
+The algorithm gets stuck on a local optimum? Since HC starts in a random spot (and we're not allowed to use random restarts) it can get stuck. HC is also Score-based.
 
+Edge from A -> C but A is also marginally dependant of C. That is why the algorithm can't find two dependant variables!
 
 ## 2. Hidden Markov Models
 ```{r}
+# Building a Hidden Markov Model
+state = rep(1:10) # Actual number of states that the robot can be in (Hidden)
+probs = rep(1/10, 10)
+symbols = 1:11 # States that we can observe (Not hidden)
+
+# If robot is in sector i:
+emissionP = matrix(c(
+  0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.5,
+  0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.5,
+  0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.5,
+  0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0.5,
+  0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0.5,
+  0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0.5,
+  0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0.5,
+  0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.5,
+  0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.5,
+  0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.5),
+  ncol = 11, byrow = TRUE
+)
+  
+#transP = matrix(c(
+#  0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0,
+#  0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0,
+#  0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0,
+#  0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0,
+#  0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0,
+#  0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0,
+#  0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0, 0,
+#  0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0.1, 0,
+#  0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0.1, 0,
+#  0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.1, 0,
+#  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+#  ncol = 11, byrow = TRUE
+#)
+transP = matrix(c(
+  0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0.5, 0.5, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0.5, 0.5, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0.5, 0.5, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0.5, 0.5, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0.5, 0.5, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5,
+  0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0.5),
+  ncol = 10, byrow = TRUE
+)
+# Initializing hidden markov model
+robot = initHMM(States = state, Symbols = symbols, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+
+# Defining path
+obs = c(1, 11, 11, 11)
+
+# Most probable path, using VITERBI algorithm
+posterior(robot, obs)
+viterbi(robot, obs)
+
+# Calculating Smoothing (distribution)
+
+###true = sim_data$states # The true states, used for comparisson later
+
+alpha = exp(forward(robot, obs))
+beta = exp(backward(robot, obs))
+sum_alpha = apply(alpha, 2, sum)
+sum_alphabeta = apply(alpha*beta, 2, sum) # Only needed for filtering
+
+# Smoothed probability distribution (using all available obs)
+smoothing = t(apply(alpha*beta, 1, "/", sum_alphabeta))
+
 
 ```
+According to Viterbi, most probable path for the scenario is for the robot to stay in sector 1 all the time.
+Using the smoothing distribution, we are not so sure.
 
 ## 3. Reinforcement Learning
 ```{r}
-
+# No assignment :(((
 ```
 
 ## 4. Gaussian Processes
+### a) Extension of lab
 ```{r}
+# 2.1
+posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){ # signaF NOT squared
+  #par = c(sigmaF, l)
+  K = k(X,X, sigmaF^2, l)
+  #K = k(par,X,X)
+  n = length(XStar)
+  L = t(chol(K + sigmaNoise^2*diag(dim(K)[1])))
+  kStar = k(X,XStar, sigmaF^2, l)
+  #kStar = k(par,X,XStar)
+  alpha = solve(t(L), solve(L,y))
+  
+  FStar = t(kStar) %*% alpha
+  v = solve(L, kStar)
+  vf = k(XStar, XStar, sigmaF^2, l) - t(v)%*%v #+ sigmaNoise^2*diag(n) #Adding sigma for noise
+  #vf = k(par,XStar, XStar) - t(v)%*%v #+ sigmaNoise^2*diag(n) #Adding sigma for noise
+  logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
+
+  return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
+  #return(logmarglike)
+}
+
+SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
+  n1 <- length(x1)
+  n2 <- length(x2)
+  K <- matrix(NA,n1,n2)
+  for (i in 1:n2){
+    K[,i] <- sigmaF^2*exp(-0.5*( (x1-x2[i])/l)^2 )
+  }
+  return(K)
+}
+
+# Reading the data
+temps = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/TempTullinge.csv", header=TRUE, sep=";")$temp
+time = seq(from=1, to=2190, by=5)
+temps = temps[time]
+day = rep(seq(from=1, to=361, by=5), times=6)
+# Data scaling
+daymean = mean(day)
+daysd = sd(day)
+timemean = mean(time)
+timesd = sd(time)
+tempsmean = mean(temps)
+tempssd = sd(temps)
+
+day_s = scale(day)
+time_s = scale(time)
+temps_s = scale(temps)
+
+# Search for the best hyperparameters
+
+# Approach 1 - Search Grid
+polyFit <- lm(temps_s ~ time_s + I(time_s^2))
+sigmaN = sd(polyFit$residuals)
+
+top_sigmaF = 0
+top_ell = 0
+top_lik = -100000
+for(sigmaF in seq(0.1, 3, by=0.1)){
+  for(ell in seq(0.01, 0.2, by=0.05)){
+    
+    res = posteriorGP(X = time_s, y = temps_s, XStar = time_s, sigmaNoise = sigmaN, k = SquaredExpKernel, sigmaF = sigmaF, l=ell)
+    if (res$logmarglike > top_lik){
+      print("updating!")
+      top_sigmaF <<- sigmaF
+      top_ell <<- ell
+      top_lik <<- res$logmarglike
+    }
+  }
+}
+top_ell
+top_sigmaF
+top_lik
+
+# Approach 2 - Optim
+SEKernel2 <- function(par=c(20,0.2),x1,x2){
+  n1 <- length(x1)
+  n2 <- length(x2)
+  K <- matrix(NA,n1,n2)
+  for (i in 1:n2){
+    K[,i] <- (par[1]^2)*exp(-0.5*( (x1-x2[i])/par[2])^2 )
+  }
+  return(K)
+}
+
+# Får det inte att fungera...
+optim(par = c(1,0.1),
+fn = posteriorGP, X=time_s, y=temp_s, k=SEKernel2, sigmaNoise=sigmaN, method="L-BFGS-B",
+lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
 
 ```
+
+### b)
+```{r}
+data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
+names(data) <- c("varWave","skewWave","kurtWave","entropyWave","fraud")
+data[,5] <- as.factor(data[,5])
+set.seed(111); 
+SelectTraining <- sample(1:dim(data)[1], size = 1000, replace = FALSE)
+
+train_data = data[SelectTraining,]
+test_data = data[-SelectTraining,]
+  #GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data, kernel="rbfdot", kpar = list(sigma=par[1]))
+
+
+acVal = function(par=c(0.1)){# 'par' måste finnas med här!
+  GPfitfraud =  gausspr(x = train_data[,1:4], y = train_data[,5], kernel = "rbfdot", kpar = list(sigma=par[1]))
+  #GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data, kernel="rbfdot", kpar = list(sigma=par[1]))
+  pred = predict(GPfitfraud,test_data[,1:4])
+  conf = table(pred, test_data[,5])
+  acc = sum(diag(conf))/sum(conf)
+  return(acc)
+}
+
+optim(par = c(0.05),
+fn = acVal, method="L-BFGS-B",
+lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
+
+### SEARCH GRID
+
+best_acc = 0
+best_sigma = 0.05
+for(sigma in seq(0.05, 1, by=0.05)){
+    acc = acVal(sigma)
+    if (acc > best_acc){
+      print("updating!")
+      best_acc <<- acc
+      best_sigma <<- sigma
+    }
+}
+best_acc
+best_sigma
+
+```
+
 
 ## Another chunk
 ```{r}
 
 ```
-

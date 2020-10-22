@@ -8,6 +8,10 @@ output: pdf_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
 # Include packages here
+library(bnlearn)
+library(gRain)
+library(HMM)
+
 ```
 
 ## 1. Graphical Models

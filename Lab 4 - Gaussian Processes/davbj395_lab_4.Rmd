@@ -26,7 +26,7 @@ SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
 ## 2.1) (1)
 ```{r}
 # Simulating from posterior distribution of f
-posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){
+posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){ # signaF NOT squared
   
   K = k(X,X, sigmaF^2, l)
   n = length(XStar)
@@ -36,9 +36,9 @@ posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){
   
   FStar = t(kStar) %*% alpha
   v = solve(L, kStar)
-  vf = k(XStar, XStar, sigmaF^2, l) - t(v)%*%v #+ sigmaNoise*diag(n) #Adding sigma for noise
+  vf = k(XStar, XStar, sigmaF^2, l) - t(v)%*%v #+ sigmaNoise^2*diag(n) #Adding sigma for noise
   logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
-  # Returns a vector with the posterior mean and variance
+  
   return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
 }
 ```
@@ -321,9 +321,9 @@ sum(diag(conf))/sum(conf)
 GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data)
 GPfitfraud
 # Predict on the test set
-pred_new = predict(GPfitfraud,test_data)
+pred_new = predict(GPfitfraud,test_data[,1:4])
 # Confusion matrix (test)
-conf_new = table(pred_new, data[-SelectTraining,5])
+conf_new = table(pred_new, test_data[,5])
 print(conf_new)
 # Computing accuracy
 sum(diag(conf_new))/sum(conf_new)
