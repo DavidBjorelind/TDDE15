@@ -1,0 +1,250 @@
+---
+title: "exam_XXSX_mysol"
+author: "David Björelind"
+date: "10/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+library(bnlearn)
+library(gRain)
+library(HMM)
+
+```
+
+## 1. Graphical Models
+```{r}
+set.seed(567)
+data("asia")
+ind <- sample(1:5000, 4000)
+tr <- asia[ind,]
+te <- asia[-ind,]
+
+point = c(10, 20, 50, 100, 1000, 2000)
+
+# Learning a Naive Bayes
+bn = model2network("[S][A|S][T|S][L|S][B|S][D|S][E|S][X|S]")
+plot(bn)
+
+parameters = bn.fit(bn, data = tr, method = "bayes")
+grain = as.grain(parameters) # Conditional probabilities, full compared to network (bn.fit) Moralize and triangulate
+structure = compile(grain) # creating junction tree, separators & residuals. Potentials for the cliques
+
+### Function to classify data from a BN ###
+classify = function(structure, test_data, info){ # Use output from COMPILE as input
+  # info contains all the nodes we have information about
+  # Cleaning data
+  clean_data = c()
+  for (i in 1:length(test_data)){
+    clean_data = c(clean_data, as.character(test_data[1,i]));
+  }
+
+  goal = c("S")
+  evi = setEvidence(structure, nodes = info, states = clean_data) # Taking our nodes into consideration
+  dist = querygrain(evi, nodes = goal) # Querying the tree -> getting conditional probabilities for nodes provided
+  if (dist$S[1] < 0.5){
+    return("yes")
+  }else{
+    return("no")
+  }
+}
+
+info = c("A", "T", "L", "B", "E", "X", "D")
+acc = c()
+for (i in point){
+  print(i)
+  parameters = bn.fit(bn, data = tr[1:i,], method = "bayes")
+  grain = as.grain(parameters)
+  structure = compile(grain)
+  pred = c()
+  for (j in 1:dim(te)[1]){
+    pred = c(pred, classify(structure, te[j,-2], info))
+  }
+  
+  conf_matrix = table(pred, te[,2])
+  ac = sum(diag(conf_matrix))/sum(conf_matrix)
+  acc = c(acc, ac)
+}
+
+# Reversing the arrows
+bn = model2network("[A][T][L][B][D][E][X][S|A:B:D:E:L:T:X]")
+plot(bn)
+
+info = c("A", "T", "L", "B", "E", "X", "D")
+acc = c()
+for (i in point){
+  print(i)
+  parameters = bn.fit(bn, data = tr[1:i,], method = "bayes")
+  grain = as.grain(parameters)
+  structure = compile(grain)
+  pred = c()
+  for (j in 1:dim(te)[1]){
+    pred = c(pred, classify(structure, te[j,-2], info))
+  }
+  
+  conf_matrix = table(pred, te[,2])
+  ac = sum(diag(conf_matrix))/sum(conf_matrix)
+  acc = c(acc, ac)
+}
+```
+The accuracy is not really increasing! Naive Bayes Classifier is not good in this case.
+
+Reversing the edges gets better performance!
+
+WHY??
+Naive Bayes assumes that, given S, all other nodes are independent of each other. This is because the DAG contains many forks. This makes calculations easy, but we are making many assumptions about the data.
+
+In the opposite case, the DAG contains many colliders. It will be much more expensive to compute the conditional distribution, but we are not assuming any independence between any variables.
+
+
+## 2. Hidden Markov Models
+```{r}
+state = rep(1:10) # Actual number of states that the robot can be in (Hidden)
+symbols = 1:11 # States that we can observe (Not hidden)
+probs = rep(1/10, 10) # 
+
+emissionP = matrix(0, 10, 10)
+transP = matrix(0, 10, 10)
+funcmod = function(i){
+  if(i == 10){
+    return(i)
+  } else if(i<=0){
+    return(i+10)
+  }else{
+    return(i%%10)
+  }
+}
+for (i in 1:10){
+  transP[i,i] = 0.5
+  transP[i, funcmod(i+1)] = 0.5
+  for(j in -2:2){
+    emissionP[i,funcmod(i+j)] = 0.2
+  }  
+}
+robot = initHMM(States = state, Symbols = state, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+set.seed(12345) # Go to same result every time
+niter = 100
+sim_data = simHMM(robot, niter)
+sim_data
+obs = sim_data$observation
+
+# Creating my own filtering distribution
+alpha = matrix(NA, nrow = length(state), ncol = length(obs))
+
+# Initial, 1st 
+for (i in state){
+  alpha[i,1] = probs[i]*emissionP[obs[1],i]
+}
+
+# Rest of the times
+for (t in 2:length(obs)){
+  for (i in state){
+    alpha[i,t] = emissionP[i,obs[t]] * sum( transP[,i] * alpha[,t-1] )
+    
+  }
+}
+
+alpha_test = exp(forward(robot, obs))
+
+# Filtered distribution
+sum_alpha = apply(alpha, 2, sum)
+filter = t(apply(alpha, 1,"/", sum_alpha))
+
+sum_alpha_test = apply(alpha_test, 2, sum)
+filter_test = t(apply(alpha_test, 1,"/", sum_alpha_test))
+
+# Most probable path for both
+best_alpha = apply(alpha,1,which.max)
+table(best_alpha==sim$states)
+
+best_alpha_test = apply(alpha_test,1,which.max)
+table(best_alpha_test==sim$states)
+
+```
+SAME PERFORMANCE! OK
+
+## Backwards algorithm
+```{r}
+beta_test = exp(backward(robot, obs))
+
+# Creating my own smoothing distribution
+beta = matrix(NA, nrow = length(state), ncol = length(obs))
+
+# Initial, 1st 
+beta[,length(obs)] = 1
+
+# Rest of the times
+for (t in (length(obs)-1):1){
+  for (i in state){
+    beta[i,t] = sum( emissionP[ ,obs[t+1]] * transP[i,] * beta[,t+1] )
+  }
+}
+
+sum_alphabeta = apply(alpha*beta, 2, sum)
+smoothing = t(apply(alpha*beta, 1, "/", sum_alphabeta))
+```
+
+## 3. Reinforcement Learning
+```{r}
+ # No exercise :(((((
+```
+
+## 4. Gaussian Processes
+### (1)
+```{r}
+Matern32 <- function(sigmaf = 1, ell = 1) 
+{
+  rval <- function(x, y = NULL) {
+      r = sqrt(crossprod(x-y));
+      return(sigmaf^2*(1+sqrt(3)*r/ell)*exp(-sqrt(3)*r/ell))
+    }
+  class(rval) <- "kernel"
+  return(rval)
+}
+
+sigmaF = sqrt(1)
+ell = 0.5
+
+zGrid = seq(0.01, 1, by=0.01)
+MaternFunc = Matern32(sigmaf = sigmaF, ell = ell)
+fvals_1 = c()
+for(i in 1:length(zGrid)){
+  fvals_1 = c(fvals_1, MaternFunc(0, zGrid[i]))
+}
+
+sigmaF = sqrt(0.5)
+zGrid = seq(0.01, 1, by=0.01)
+MaternFunc = Matern32(sigmaf = sigmaF, ell = ell)
+fvals_2 = c()
+
+for(i in 1:length(zGrid)){
+  fvals_2 = c(fvals_2, MaternFunc(0, zGrid[i]))
+}
+
+plot(x = zGrid, y = fvals_1, type='l', lwd=2, col="red", main="red: sigma = 1, blue: sigma = 0.5", ylim=c(0,1))
+lines(x = zGrid, y = fvals_2, type='l', lwd=2, col="blue")
+
+```
+the kernel gives us a value between 0 to 1 on how close two values are in space. If they are the same, the kernel returns 1 and approaches 0 as distance goes to infinity. As expected, the correlation decreases as sigma_f decreases.
+
+Smoothness: A large sigmaF increases the returned kernel value. This will increase the correlation and therefore make **f** less smooth.
+
+sigmaF simply scales the kernel down to 1/2 of the f-values from before! The shape is the same, but **f** values will be more **smooth**.
+
+### (2)
+```{r}
+
+```
+
+## Another chunk
+```{r}
+
+```
+
+## Another chunk
+```{r}
+
+```
+

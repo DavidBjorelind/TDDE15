@@ -195,7 +195,7 @@ Using the smoothing distribution, we are not so sure.
 
 ## 4. Gaussian Processes
 ### a) Extension of lab
-```{r}
+```{}
 # 2.1
 posteriorGP = function(X, y, XStar, sigmaNoise, k, sigmaF, l){ # signaF NOT squared
   #par = c(sigmaF, l)
@@ -281,14 +281,14 @@ SEKernel2 <- function(par=c(20,0.2),x1,x2){
 }
 
 # Får det inte att fungera...
-optim(par = c(1,0.1),
-fn = posteriorGP, X=time_s, y=temp_s, k=SEKernel2, sigmaNoise=sigmaN, method="L-BFGS-B",
-lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
+#optim(par = c(1,0.1),
+#fn = posteriorGP, X=time_s, y=temp_s, k=SEKernel2, sigmaNoise=sigmaN, method="L-BFGS-B",
+#lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
 
 ```
 
 ### b)
-```{r}
+```{}
 data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
 names(data) <- c("varWave","skewWave","kurtWave","entropyWave","fraud")
 data[,5] <- as.factor(data[,5])

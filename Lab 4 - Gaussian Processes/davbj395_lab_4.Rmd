@@ -319,9 +319,10 @@ sum(diag(conf))/sum(conf)
 ## 2.3 (3)
 ```{r}
 GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data)
+GPfit = gausspr(x=time_s, y=temps_s, kernel = SEKernelfunc(ell, sigmaf), var = sigma^2, type="regression")
 GPfitfraud
 # Predict on the test set
-pred_new = predict(GPfitfraud,test_data[,1:4])
+pred_new = predict(GPfitfraud,test_data[,1:4 ])
 # Confusion matrix (test)
 conf_new = table(pred_new, test_data[,5])
 print(conf_new)

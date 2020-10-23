@@ -256,7 +256,8 @@ count = 0
 covs = rep(0,length(zGrid))
 for (z in zGrid){
   count = count + 1
-  covs[count] <- sigma2f*k(sigmaf = 1, ell = ell)(0,z)
+  #covs[count] <- sigma2f*k(sigmaf = 1, ell = ell)(0,z)
+  covs[count] <- sigma2f*k(0,z)
 }
 plot(zGrid, covs, type = "l", xlab = "ell")
 
@@ -273,7 +274,8 @@ count = 0
 covs = rep(0,length(zGrid))
 for (z in zGrid){
   count = count + 1
-  covs[count] <- sigma2f*k(sigmaf = 1, ell = ell)(0,z)
+  #covs[count] <- sigma2f*k(sigmaf = 1, ell = ell)(0,z)
+  covs[count] <- sigma2f*k(0,z)
 }
 plot(zGrid, covs, type = "l", xlab = "ell")
 
