@@ -47,8 +47,9 @@ z<-lapply(y,cpdag)
 
 r=0
 for(i in 1:length(y)) {
-  if(all.equal(y[[i]],z[[i]])==TRUE)
+  if(all.equal(y[[i]],z[[i]])==TRUE){
     r<-r+1
+  }
 }
 length(y)/r
 

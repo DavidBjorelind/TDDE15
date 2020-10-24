@@ -52,15 +52,12 @@ real_s = test$S
 network = hc(asia, restart = 10, optimized = FALSE) # Training a network for our data using Hillclimbing algorithm
 parameters = bn.fit(network, train) # Conditional parameters for all nodes
 
-classify = function(parameters, classify_data, info){
+classify = function(structure, classify_data, info){ # Use structure from compile as input!!!
   # Cleaning data
   clean_data = c()
   for (i in 1:length(classify_data)){
     clean_data = c(clean_data, as.character(classify_data[1,i]));
   }
-  
-  grain = as.grain(parameters) # Conditional probabilities, full compared to network (bn.fit) Moralize and triangulate
-  structure = compile(grain) # creating junction tree, separators & residuals. Potentials for the cliques
   
   goal = c("S")
   evi = setEvidence(structure, nodes = info, states = clean_data) # Taking our nodes into consideration
@@ -71,12 +68,15 @@ classify = function(parameters, classify_data, info){
     return("no")
   }
 }
-
+  
+  grain = as.grain(parameters) # Conditional probabilities, full compared to network (bn.fit) Moralize and triangulate
+  structure = compile(grain) # creating junction tree, separators & residuals. Potentials for the cliques
+  
 # Making predictions on the test set
 nodes = c("A", "T", "L", "B", "E", "X", "D")
 pred = c()
 for (i in 1:nrow(test)){
-  pred = c(pred, classify(parameters, test[i,][-2], info = nodes))
+  pred = c(pred, classify(structure, test[i,][-2], info = nodes))
 }
 
 ```

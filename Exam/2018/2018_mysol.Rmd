@@ -235,6 +235,73 @@ sigmaF simply scales the kernel down to 1/2 of the f-values from before! The sha
 
 ### (2)
 ```{r}
+data = read.table("LidarData.txt", header = TRUE, dec = ".")
+dist = data$Distance
+logratio = data$LogRatio
+y_mean = mean(logratio)
+y_sd = sd(logratio)
+
+ell = c(1,5)
+sigmaF = 1
+sigmaN = 0.05
+
+# Covariance function
+SEKernelfunc = function(ell, sigmaf){
+  kernel = function(x1, x2){
+  r = sqrt(sum((x1 - x2)^2))
+  return(sigmaf^2*exp(-r^2/(2*ell^2)))
+  }
+  class(kernel) <- "kernel"
+  return(kernel)
+}
+
+# Gaussian model
+kernelFunc = SEKernelfunc(ell[1],sigmaF)
+GPfit = gausspr(x=scale(dist), y=scale(logratio), kernel = kernelFunc, var = sigmaN, type="regression")
+meanpred = predict(GPfit, scale(dist))
+
+plot(x = dist, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="logRatio", main="Distance vs. LogRatio")
+
+### b) 95% probability interval for f (This is done in the lab!!)
+# Covariance matrix
+
+xgrid = seq(min(dist), max(dist), length.out = length(dist))
+n <- length(dist)
+Kss <- kernelMatrix(kernel = kernelFunc, x = xgrid, y = xgrid)
+Kxx <- kernelMatrix(kernel = kernelFunc, x = dist, y = dist)
+Kxs <- kernelMatrix(kernel = kernelFunc, x = dist, y = xgrid)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs)
+
+plot(x = dist, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="logRatio", main="Distance vs. LogRatio")
+lines(x = dist, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf))*y_sd, col="blue", type='l')
+lines(x = dist, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf))*y_sd, col="blue", type='l')
+
+
+### c) 95% prediction interval for y (Adding noise to the tails of intervals of f )
+plot(x = dist, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="logRatio", main="Distance vs. LogRatio")
+lines(x = dist, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf) + sigmaN^2)*y_sd, col="purple", type='l')
+lines(x = dist, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf) + sigmaN^2)*y_sd, col="purple", type='l')
+
+### Other value for ell
+kernelFunc = SEKernelfunc(2,sigmaF)
+GPfit = gausspr(x=scale(dist), y=scale(logratio), kernel = kernelFunc, var = sigmaN, type="regression")
+meanpred = predict(GPfit, scale(dist))
+
+plot(x = dist, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="logRatio", main="Distance vs. LogRatio")
+
+### b) 95% probability interval for f (This is done in the lab!!)
+# Covariance matrix
+
+xgrid = seq(min(dist), max(dist), length.out = length(dist))
+n <- length(dist)
+Kss <- kernelMatrix(kernel = kernelFunc, x = xgrid, y = xgrid)
+Kxx <- kernelMatrix(kernel = kernelFunc, x = dist, y = dist)
+Kxs <- kernelMatrix(kernel = kernelFunc, x = dist, y = xgrid)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs)
+
+plot(x = dist, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="logRatio", main="Distance vs. LogRatio")
+lines(x = dist, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf))*y_sd, col="blue", type='l')
+lines(x = dist, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf))*y_sd, col="blue", type='l')
 
 ```
 
@@ -242,9 +309,3 @@ sigmaF simply scales the kernel down to 1/2 of the f-values from before! The sha
 ```{r}
 
 ```
-
-## Another chunk
-```{r}
-
-```
-

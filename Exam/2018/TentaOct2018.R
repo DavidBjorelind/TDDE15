@@ -291,7 +291,9 @@ plot(zGrid, covs, type = "l", xlab = "ell")
 library(kernlab)
 load("lidar.RData") # loading the data
 sigmaNoise = 0.05
-x = distance
+#x = distance
+#y = logratio
+x = dist
 y = logratio
 
 # Set up the kernel function

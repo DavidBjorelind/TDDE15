@@ -1,0 +1,92 @@
+---
+title: "exam_2017_mysol"
+author: "David Björelind"
+date: "10/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+library(bnlearn)
+library(gRain)
+library(HMM)
+
+```
+
+## 1. Graphical Models
+```{r}
+
+### a) ###
+data("asia")
+train = x
+# Using HC to learn structure and parameters
+network = hc(asia, restart = 10)
+plot(network)
+parameters = bn.fit(network, asia) # Conditional parameters for all nodes
+
+grain = as.grain(parameters) # Conditional probabilities, full compared to network (bn.fit) Moralize and triangulate
+structure = compile(grain) # creating junction tree, separators & residuals. Potentials for the cliques
+# Want to test D _|_ X | E
+
+evi = setEvidence(structure, nodes = c("X", "E"), states = c("no", "no")) 
+dist1 = querygrain(evi, nodes = c("D"))
+evi = setEvidence(structure, nodes = c("X", "E"), states = c("no", "yes")) 
+dist2 = querygrain(evi, nodes = c("D"))
+evi = setEvidence(structure, nodes = c("X", "E"), states = c("yes", "no")) 
+dist3 = querygrain(evi, nodes = c("D"))
+evi = setEvidence(structure, nodes = c("X", "E"), states = c("yes", "yes")) 
+dist4 = querygrain(evi, nodes = c("D"))
+
+### b) ###
+# Essential DAGs
+network = hc(asia, restart = 10)
+plot(network)
+a = cpdag(network)
+plot(a)
+
+# Generating grapgs
+graphs = random.graph(c("A","B","C","D","E"), num = 50000)
+graphs = unique(graphs)
+cpdags = lapply(graphs, cpdag)
+
+# Comparing graphs
+count = 0
+for (i in 1:length(cpdags)){
+  if(all.equal(graphs[[i]], cpdags[[i]]) == TRUE){
+    count = count+1
+  }
+}
+
+# Ratio
+ratio = count/length(graphs)
+
+### Essential DAG: ###
+# Not Markov equivalent to any other DAG. Aka the union of all Markov equivalent DAGs
+
+### Markov equivalent: ###
+# Have the same skeleton
+# Having the same colliders
+```
+
+## 2. Hidden Markov Models
+```{r}
+
+
+```
+
+## 3. Reinforcement Learning
+```{r}
+
+```
+
+## 4. Gaussian Processes
+```{r}
+load("GPdata.RData")
+
+```
+
+## Another chunk
+```{r}
+
+```
