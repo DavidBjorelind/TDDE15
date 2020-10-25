@@ -112,8 +112,10 @@ post = posterior(robot, obs)
 apply(post, 2, which.maxima)
 ```
 
-## 3. Reinforcement Learning
+## 3. Gaussian Processes
 ```{r}
+library(mvtnorm)
+library(kernlab)
 # Covariance function
 SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
   n1 <- length(x1)
@@ -124,20 +126,151 @@ SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
   }
   return(K)
 }
+# Returning a kernel: Squared Exponential
+SEKernelfunc = function(ell, sigmaf){
+  kernel = function(x1, x2){
+  r = sqrt(sum((x1 - x2)^2))
+  return(sigmaf^2*exp(-r^2/(2*ell^2)))
+  }
+  class(kernel) <- "kernel"
+  return(kernel)
+}
 
 sigmaF = sqrt(1)
 ell = c(0.2,1)
 xGrid = seq(-1,1, by=0.1)
-```
 
-## 4. Gaussian Processes
+# Prior distribution of f (ell=0.2)
+k = SEKernelfunc(ell[1], sigmaF)
+k_matrix = kernelMatrix(k, xGrid, xGrid)
+prior = rmvnorm(n=1, mean = rep(0,length(xGrid)) , sigma = k_matrix)
+plot(x=xGrid, y=prior, type='l', main="ell = 0.2")
+cols = c("blue", "red", "green", "orange")
+for(i in 1:4){
+  prior = rmvnorm(n=1, mean =rep(0,length(xGrid)) , sigma = k_matrix)
+  lines(x=xGrid, y=prior, type='l', col = cols[i])
+}
+
+# Prior distribution of f (ell=1)
+k = SEKernelfunc(ell[2], sigmaF)
+k_matrix = kernelMatrix(k, xGrid, xGrid)
+prior = rmvnorm(n=1, mean = rep(0,length(xGrid)) , sigma = k_matrix)
+plot(x=xGrid, y=prior, type='l', main="ell = 1")
+cols = c("blue", "red", "green", "orange")
+for(i in 1:4){
+  prior = rmvnorm(n=1, mean =rep(0,length(xGrid)) , sigma = k_matrix)
+  lines(x=xGrid, y=prior, type='l', col = cols[i])
+}
+```
+Ell = 1 produces much smoother priors!! Produces very different result when run multiple times.
+
+## (i) and (ii)
+```{r}
+# ell = 0.2
+k = SEKernelfunc(ell[1], sigmaF)
+k(0,0.1)
+k(0,0.5)
+
+# ell = 1
+k = SEKernelfunc(ell[2], sigmaF)
+k(0,0.1)
+k(0,0.5)
+```
+For a larger **ell**, it takes a larger difference between x1 and x2 for the correlation funciton to decrease (0.04 vs. 0.88).
+Note here that correlation = covariance because sigmaF = 1.
+
+## b)
 ```{r}
 load("GPdata.RData")
+sigmaN = 0.2
+sigmaF = 1
+ell = c(0.2, 1)
+y_mean = mean(y)
+y_sd = sd(y)
+n <- length(x)
+xgrid = seq(min(x), max(x), length.out = n)
 
+# i) Posterior mean
+kernelFunc = SEKernelfunc(ell[1],sigmaF)
+GPfit = gausspr(x=scale(x), y=scale(y), kernel = kernelFunc, var = sigmaN, type="regression")
+#meanpred = predict(GPfit, scale(x))
+meanpred = predict(GPfit, scale(xgrid))
+
+plot(x = xgrid, y = meanpred*y_sd+y_mean, col="red", type='l', ylab="y", main="x vs. y")
+
+  ### 95% probability interval for f (This is done in the lab!!)
+
+# Covariance matrix
+Kss <- kernelMatrix(kernel = kernelFunc, x = xgrid, y = xgrid)
+Kxx <- kernelMatrix(kernel = kernelFunc, x = x, y = x)
+Kxs <- kernelMatrix(kernel = kernelFunc, x = x, y = xgrid)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaN^2*diag(n), Kxs)
+
+plot(x = xgrid, y = meanpred*y_sd+y_mean, col="red", type='l', lwd = 2, ylab="y", main="ell = 0.2")
+lines(x = x, y = y, col="black", type='p', cex = 0.5)
+lines(x = xgrid, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf)), col="blue", type='l')
+lines(x = xgrid, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf)), col="blue", type='l')
+
+### 95% prediction interval for a new data point y
+lines(x = xgrid, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf) + sigmaN^2), col="green", type='l')
+lines(x = xgrid, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf) + sigmaN^2), col="green", type='l')
+
+### ell = 1
+kernelFunc = SEKernelfunc(ell[2],sigmaF)
+GPfit = gausspr(x=scale(x), y=scale(y), kernel = kernelFunc, var = sigmaN, type="regression")
+meanpred = predict(GPfit, scale(xgrid))
+
+n <- length(x)
+xgrid = seq(min(x), max(x), length.out = n)
+Kss <- kernelMatrix(kernel = kernelFunc, x = xgrid, y = xgrid)
+Kxx <- kernelMatrix(kernel = kernelFunc, x = x, y = x)
+Kxs <- kernelMatrix(kernel = kernelFunc, x = x, y = xgrid)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaN^2*diag(n), Kxs)
+
+plot(x = xgrid, y = meanpred*y_sd+y_mean, col="red", type='l', lwd = 2, ylab="logRatio", main="ell = 1")
+lines(x = x, y = y, col="black", type='p', cex = 0.5)
+lines(x = xgrid, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf)), col="blue", type='l')
+lines(x = xgrid, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf)), col="blue", type='l')
+
+### 95% prediction interval for a new data point y
+lines(x = xgrid, y = meanpred*y_sd+y_mean + 1.96*sqrt(diag(Covf) + sigmaN^2), col="green", type='l')
+lines(x = xgrid, y = meanpred*y_sd+y_mean - 1.96*sqrt(diag(Covf) + sigmaN^2), col="green", type='l')
 
 ```
+A larger **ell** makes to produced means smoother. The different between (ii) and (iii) is that we add the noise from the data. To take this into consideration, the intervals becomes wider.
 
-## Another chunk
-```{r}
+A problem with the kernel, Squared Exponential, is that the data has different smoothness for small x and large x.
 
-```
+GIVEN ANSWERS:
+# Question: Explain the difference between the results from ii) and iii). 
+# Answer: ii) is about the uncertainty of the function f, which is the MEAN of y
+#         iii) is about the uncertainty of individual y values. They are uncertain for 
+#              two reasons: you don't know f at the test point, and you don't know
+#              the error (epsilon) that will hit this individual observation
+
+# Question: Discuss the differences in results from using the two length scales.
+#           Answer: shorter length scale gives less smooth f. We are overfitting the data.
+#           Answer: longer length scale gives more smoothness.
+
+# Question: Do you think a GP with a squared exponential kernel is a good model for this data? If not, why?
+#           Answer: One would have to experiment with other length scales, or estimate
+#           the length scales (see question 3c), but this is not likely to help here.
+#           The issue is that the data seems to be have different smoothness for small x
+#           than it has for large x (where the function seems much more flat)
+#           The solution is probably to have different length scales for different x
+
+
+### Question 3(c)
+
+# For full points here you should mention EITHER of the following two approaches:
+# 1. The marginal likelihood can be used to select optimal hyperparameters, 
+# and also the noise variance. We can optimize the log marginal likelihood with
+# respect to the hyperparameters. In Gaussian Process Regression the marginal likelihood
+# is availble in closed form (a formula).
+# 2. We can use sampling methods (e.g. MCMC) to sample from the marginal posterior of the hyperparameters
+# We need a prior p(theta) for the hyperparameter and then Bayes rule gives the marginal posterior
+# p(theta | data) propto p(data | theta)*p(theta)
+# where p(data | theta) is the marginal likelihood (f has been integrated out).
+
+# If the noise variance is unknown, we can treat like any of the kernel hyperparameters and infer the noise variance 
+# jointly with the length scale and the prior variance sigma_f

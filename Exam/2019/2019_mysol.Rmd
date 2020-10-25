@@ -43,7 +43,7 @@ dim(cptM) = c(3,3,3)
 dimnames(cptM) = list("M" = c("Door1", "Door2", "Door3"), "D" =  c("Choice1", "Choice2", "Choice3"), "C" = c("Car1", "Car2", "Car3"))
 
 dist = list("D" = cptD, "C"= cptC, "M" = cptM) # Largest one needs to be last and names needs to be the same
-parameters = custom.fit(graph, dist = list("D" = cptD, "C"= cptC, "M" = cptM))
+parameters = custom.fit(graph, dist = dist)
 
 ### EXAKT INFERENCE ###
 grain = as.grain(parameters)
@@ -61,8 +61,8 @@ querygrain(evi, nodes = goal)
 evi = setEvidence(structure, nodes = c("D", "M"), states = c("Choice1", "Door3"))
 querygrain(evi, nodes = goal)
 
-### APPROXIMATE INFERENCE ###
 
+### APPROXIMATE INFERENCE ###
 a = cpdist(fitted = parameters, nodes = "C", evidence = TRUE)
 table(a)/sum(table(a))
 b =  cpdist(fitted = parameters,nodes = "C", evidence = (D=="Choice1" & M=="Door2"))

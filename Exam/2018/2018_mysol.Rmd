@@ -150,12 +150,16 @@ for (i in state){
   alpha[i,1] = probs[i]*emissionP[obs[1],i]
 }
 # Rest of the times
+#for (t in 2:length(obs)){
+#  for (i in state){
+#    alpha[i,t] = emissionP[i,obs[t]] * sum(alpha[,t-1] * transP[,i])
+#  }
+#}
+
 for (t in 2:length(obs)){
-  for (i in state){
-    alpha[i,t] = emissionP[i,obs[t]] * sum( transP[,i] * alpha[,t-1] )
-    
-  }
+    alpha[,t] = emissionP[,obs[t]] * (alpha[,t-1] %*% transP)
 }
+
 alpha_test = exp(forward(robot, obs))
 # Filtered distribution
 sum_alpha = apply(alpha, 2, sum)
@@ -169,7 +173,6 @@ best_alpha_test = apply(alpha_test,1,which.max)
 table(best_alpha_test==sim_data$states)
 ```
 
-```
 SAME PERFORMANCE! OK
 
 ## Backwards algorithm
@@ -185,12 +188,19 @@ beta[,length(obs)] = 1
 # Rest of the times
 for (t in (length(obs)-1):1){
   for (i in state){
-    beta[i,t] = sum( emissionP[ ,obs[t+1]] * transP[i,] * beta[,t+1] )
+    beta[i,t] = sum( emissionP[ ,obs[t+1]] * beta[,t+1] * transP[i,])
   }
 }
+#for (t in (length(obs)-1):1){
+#  #print(t)
+#  beta[,t] = emissionP[, obs[t+1]] * beta[,t+1] %*% transP
+#}
 
+beta_test = exp(backward(robot, obs))
 sum_alphabeta = apply(alpha*beta, 2, sum)
 smoothing = t(apply(alpha*beta, 1, "/", sum_alphabeta))
+beta[,95:100]
+beta_test[,95:100]
 ```
 
 ## 3. Reinforcement Learning
