@@ -20,8 +20,8 @@ This is my personal lab report for lab 2.
 
 ### 1) Build a hidden Markov model (HMM) for the scenario described above
 ```{r, out.width='.49\\linewidth', fig.width=5, fig.height=5,fig.show='hold',fig.align='center'}
-state = rep(1:10) # Actual number of states that the robot can be in (Hidden)
-symbols = 1:11 # States that we can observe (Not hidden)
+state = rep(1:10) # Actual number of states that the robot can be in (Hidden) Z nodes
+symbols = 1:11 # States that we can observe (Not hidden) X nodes
 probs = rep(0, 10) # 
 probs[1] = 1 # Robot starts in position 1
 
@@ -43,6 +43,8 @@ for (i in 1:10){
     emissionP[i,funcmod(i+j)] = 0.2
   }  
 }
+
+
 
 robot = initHMM(States = states, Symbols = state, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
 ```

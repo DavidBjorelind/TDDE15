@@ -71,18 +71,69 @@ ratio = count/length(graphs)
 
 ## 2. Hidden Markov Models
 ```{r}
+## Part a)
+# Building a Hidden Markov Model
+state = rep(1:100) # Actual number of states that the robot can be in (Hidden) Z nodes
+probs = rep(1/100, 100)
+symbols = 1:2 # States that we can observe (Not hidden) ### door or not? X nodes
 
+funcmod = function(i){
+  if(i == 100){
+    return(i)
+  } else if(i<=0){
+    return(i+100)
+  }else{
+    return(i%%100)
+  }
+}
 
+# If robot is in sector i:
+transP = matrix(0, nrow = length(state), ncol = length(state))
+for(i in 1:length(state)){
+  transP[i,i] = 0.1
+  transP[i, funcmod(i+1)] = 0.9
+}
+
+emissionP = matrix(.1, length(state), length(symbols))
+emissionP[,2] = 0.9
+emissionP[c(10,11,12,20,21,22,30,21,32),] = c(0.9,0.1)
+
+# Initializing hidden markov model
+robot = initHMM(States = state, Symbols = symbols, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+
+## Part b)
+which.maxima = function(x){
+  return(which(x==max(x)))
+}
+
+obs = c(1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2) # Robot at 3rd door and then moves into nothingness
+post = posterior(robot, obs)
+
+apply(post, 2, which.maxima)
 ```
 
 ## 3. Reinforcement Learning
 ```{r}
+# Covariance function
+SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
+  n1 <- length(x1)
+  n2 <- length(x2)
+  K <- matrix(NA,n1,n2)
+  for (i in 1:n2){
+    K[,i] <- sigmaF^2*exp(-0.5*( (x1-x2[i])/l)^2 )
+  }
+  return(K)
+}
 
+sigmaF = sqrt(1)
+ell = c(0.2,1)
+xGrid = seq(-1,1, by=0.1)
 ```
 
 ## 4. Gaussian Processes
 ```{r}
 load("GPdata.RData")
+
 
 ```
 
