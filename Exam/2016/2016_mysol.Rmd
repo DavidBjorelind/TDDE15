@@ -1,0 +1,136 @@
+---
+title: "exam_2016_mysol"
+author: "David Björelind"
+date: "10/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+# Include packages here
+library(bnlearn)
+library(gRain)
+library(HMM)
+
+```
+
+## 1. Graphical Models
+```{r}
+data('asia')
+
+# Learning network and parameters
+network = hc(asia, restart = 10, optimized = FALSE)
+plot(network)
+parameters = bn.fit(network, asia) # Conditional parameters for all nodes
+
+grain = as.grain(parameters) # Conditional probabilities, full compared to network (bn.fit) Moralize and triangulate
+structure = compile(grain) # creating junction tree, separators & residuals. Potentials for the cliques
+# Want to test p(A | X,B)
+
+### EXACT INFERENCE ###
+evi = setEvidence(structure, nodes = c("X", "B"), states = c("yes", "yes")) 
+dist = querygrain(evi, nodes = c("A"))
+
+### APPROXIMATE INFERENCE ###
+a = cpdist(fitted = parameters, nodes = "A", evidence = TRUE)
+table(a)/sum(table(a))
+b =  cpdist(fitted = parameters,nodes = "A", evidence = (X=="yes" & B=="yes"))
+table(b)/sum(table(b))
+
+
+# b)
+
+# Generating graphs
+graphs = random.graph(c("A","B","C","D","E"), num = 50000)
+graphs = unique(graphs)
+skele = lapply(graphs, skeleton)
+
+graphs = lapply(graphs, cpdag)
+#skele = lapply(skele, cpdag)
+
+# Comparing graphs
+count = 0
+for (i in 1:length(skele)){
+  if(all.equal(graphs[[i]], skele[[i]]) == TRUE){
+    count = count+1
+  }
+}
+
+# Ratio
+ratio = count/length(graphs)
+
+
+# c)
+
+```
+
+## 2. Hidden Markov Models
+### b)
+```{r}
+state = rep(1:10) # Actual number of states that the robot can be in (Hidden)
+probs = rep(0, 10)
+probs[1] = 1 # Starting in 1
+symbols = 1:5 # States that we can observe (Not hidden)
+
+# If robot is in sector i: # Matrix:(state X symbols)
+emissionP = matrix(c(
+  1/3, 1/3, 0, 0, 1/3,
+  1/3, 1/3, 0, 0, 1/3,
+  1/3, 1/3, 1/3, 0, 0,
+  1/3, 1/3, 1/3, 0, 0,
+  0, 1/3, 1/3, 1/3, 0,
+  0, 1/3, 1/3, 1/3, 0,
+  0, 0, 1/3, 1/3, 1/3,
+  0, 0, 1/3, 1/3, 1/3,
+  1/3, 0, 0, 1/3, 1/3,
+  1/3, 0, 0, 1/3, 1/3),
+  ncol = 5, byrow = TRUE
+)
+#emissionP = matrix(0, 10, 5)
+#emissionP[1:2,1] = 1
+#emissionP[3:4,2] = 1
+#emissionP[5:6,3] = 1
+#emissionP[7:8,4] = 1
+#emissionP[9:10,5] = 1
+
+transP = matrix(c(  # Matrix dim state X state
+  0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0.5, 0.5, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0.5, 0.5, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0.5, 0.5, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0.5, 0.5, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0.5, 0.5, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0.5, 0.5,
+  0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0.5),
+  ncol = 10, byrow = TRUE
+)
+
+robot = initHMM(States = state, Symbols = symbols, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+set.seed(12345) # Go to same result every time
+niter = 100
+sim_data = simHMM(robot, niter)
+sim_data
+
+```
+### b)
+1. Probabilistic approach
+
+2. 
+
+
+## 3. Reinforcement Learning
+```{r}
+
+```
+
+## 4. Gaussian Processes
+```{r}
+
+```
+
+## Another chunk
+```{r}
+
+```

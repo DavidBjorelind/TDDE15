@@ -114,10 +114,10 @@ transition_model <- function(x, y, action, beta){
   # Returns:
   #   The new state after the action has been taken.
   
-  delta <- sample(-1:1, size = 1, prob = c(0.5*beta,1-beta,0.5*beta))
-  final_action <- ((action + delta + 3) %% 4) + 1
-  foo <- c(x,y) + unlist(action_deltas[final_action])
-  foo <- pmax(c(1,1),pmin(foo,c(H,W)))
+  delta <- sample(-1:1, size = 1, prob = c(0.5*beta,1-beta,0.5*beta)) # Calculating slippage with beta (0 is the normal move)
+  final_action <- ((action + delta + 3) %% 4) + 1 # Adjusting move according to slippage
+  foo <- c(x,y) + unlist(action_deltas[final_action]) # Calculating new position
+  foo <- pmax(c(1,1),pmin(foo,c(H,W))) # Restricts so we cannot go outside of environment
   
   return (foo)
 }
@@ -179,6 +179,7 @@ reward_map <- matrix(0, nrow = H, ncol = W)
 reward_map[3,6] <- 10
 reward_map[2:4,3] <- -1
 
+# Global variable q-table
 q_table <- array(0,dim = c(H,W,4))
 
 vis_environment()

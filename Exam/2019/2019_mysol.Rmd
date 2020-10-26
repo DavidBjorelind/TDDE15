@@ -121,7 +121,7 @@ probs = rep(1/10, 10)
 symbols = 1:11 # States that we can observe (Not hidden)
 
 # If robot is in sector i:
-emissionP = matrix(c(
+emissionP = matrix(c( # Matrix:(state X symbols)
   0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.1, 0.5,
   0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.1, 0.5,
   0.1, 0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0, 0, 0.5,
@@ -135,7 +135,7 @@ emissionP = matrix(c(
   ncol = 11, byrow = TRUE
 )
 
-transP = matrix(c(
+transP = matrix(c( # Matrix dim state X state
   0.5, 0.5, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0.5, 0.5, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0.5, 0.5, 0, 0, 0, 0, 0, 0,
@@ -274,6 +274,130 @@ SEKernel2 <- function(par=c(20,0.2),x1,x2){
 
 ### b)
 ```{}
+data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
+names(data) <- c("varWave","skewWave","kurtWave","entropyWave","fraud")
+data[,5] <- as.factor(data[,5])
+set.seed(111); 
+SelectTraining <- sample(1:dim(data)[1], size = 1000, replace = FALSE)
+
+train_data = data[SelectTraining,]
+test_data = data[-SelectTraining,]
+  #GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data, kernel="rbfdot", kpar = list(sigma=par[1]))
+
+
+acVal = function(par=c(0.1)){# 'par' måste finnas med här!
+  GPfitfraud =  gausspr(x = train_data[,1:4], y = train_data[,5], kernel = "rbfdot", kpar = list(sigma=par[1]))
+  #GPfitfraud <- gausspr(fraud ~  varWave + skewWave + kurtWave + entropyWave, data=train_data, kernel="rbfdot", kpar = list(sigma=par[1]))
+  pred = predict(GPfitfraud,test_data[,1:4])
+  conf = table(pred, test_data[,5])
+  acc = sum(diag(conf))/sum(conf)
+  return(acc)
+}
+
+optim(par = c(0.05),
+fn = acVal, method="L-BFGS-B",
+lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
+
+### SEARCH GRID
+
+best_acc = 0
+best_sigma = 0.05
+for(sigma in seq(0.05, 1, by=0.05)){
+    acc = acVal(sigma)
+    if (acc > best_acc){
+      print("updating!")
+      best_acc <<- acc
+      best_sigma <<- sigma
+    }
+}
+best_acc
+best_sigma
+
+```
+
+
+## 4 again: Gaussian Processes
+### a)
+```{r}
+# Reading the data
+temps = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/TempTullinge.csv", header=TRUE, sep=";")$temp
+
+time = seq(from=1, to=2190, by=5)
+temps = temps[time]
+day = rep(seq(from=1, to=361, by=5), times=6)
+# Data scaling
+daymean = mean(day)
+daysd = sd(day)
+timemean = mean(time)
+timesd = sd(time)
+tempsmean = mean(temps)
+tempssd = sd(temps)
+
+day_s = scale(day)
+time_s = scale(time)
+temps_s = scale(temps)
+
+# Simulating from posterior distribution of f
+posteriorGP = function(par, X, y, XStar, sigmaNoise, k){ # signaF NOT squared
+  K = k(X,X, par[1]^2, par[2])
+  n = length(XStar)
+  L = t(chol(K + sigmaNoise^2*diag(dim(K)[1])))
+  kStar = k(X,XStar, par[1]^2, par[2])
+  alpha = solve(t(L), solve(L,y))
+  
+  #FStar = t(kStar) %*% alpha
+  #v = solve(L, kStar)
+  #vf = k(XStar, XStar, sigmaF^2, l) - t(v)%*%v #+ sigmaNoise^2*diag(n) #Adding sigma for noise
+  logmarglike = -t(y)%*%alpha/2 - sum(diag(L)) - n/2*log(2*pi)
+  #return(list("mean" = FStar,"variance" = vf,"logmarglike" = logmarglike))
+  return(logmarglike)
+}
+
+SquaredExpKernel <- function(x1,x2,sigmaF=1,l=3){
+  n1 <- length(x1)
+  n2 <- length(x2)
+  K <- matrix(NA,n1,n2)
+  for (i in 1:n2){
+    K[,i] <- sigmaF^2*exp(-0.5*( (x1-x2[i])/l)^2 )
+  }
+  return(K)
+}
+
+
+### Approach 1: optim ###
+polyFit <- lm(temps_s ~ time_s + I(time_s^2))
+sigmaN = sd(polyFit$residuals)
+
+res = optim(par = c(1,0.1), fn = posteriorGP, X=time_s, y=temps_s, XStar = time_s, k=SquaredExpKernel, sigmaNoise=sigmaN, method="L-BFGS-B", lower = c(.Machine$double.eps, .Machine$double.eps), control=list(fnscale=-1))
+
+res$par
+res$value
+
+### Approach 2: Search grid ###
+top_ell = 0
+top_sigma = 0
+top_log = -1000000
+
+for( ell in seq(0.05, 1, by=0.05)){
+  for( sigma in seq(0, 10, by=0.5)){
+    log = posteriorGP(c(sigma,ell), X=time_s, y=temps_s, XStar=time_s, sigmaNoise=sigmaN, k=SquaredExpKernel)
+    if(log> top_log){
+      print("updating!")
+      top_ell = ell
+      top_sigma = sigma
+      top_log = log
+    }
+  }
+}
+
+top_ell
+top_sigma
+top_log
+```
+Very similar results!!
+
+### b)
+```{r}
 data <- read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
 names(data) <- c("varWave","skewWave","kurtWave","entropyWave","fraud")
 data[,5] <- as.factor(data[,5])

@@ -45,7 +45,7 @@ plot(network)
 a = cpdag(network)
 plot(a)
 
-# Generating grapgs
+# Generating graphs
 graphs = random.graph(c("A","B","C","D","E"), num = 50000)
 graphs = unique(graphs)
 cpdags = lapply(graphs, cpdag)

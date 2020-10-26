@@ -25,8 +25,8 @@ symbols = 1:11 # States that we can observe (Not hidden) X nodes
 probs = rep(0, 10) # 
 probs[1] = 1 # Robot starts in position 1
 
-emissionP = matrix(0, 10, 10)
-transP = matrix(0, 10, 10)
+emissionP = matrix(0, 10, 10) # Matrix:(state X symbols)
+transP = matrix(0, 10, 10)  # Matrix dim state X state
 funcmod = function(i){
   if(i == 10){
     return(i)
@@ -44,9 +44,14 @@ for (i in 1:10){
   }  
 }
 
-
-
 robot = initHMM(States = states, Symbols = state, startProbs = probs, transProbs = transP, emissionProbs = emissionP)
+
+### Essential DAG: ###
+# Not Markov equivalent to any other DAG. Aka the union of all Markov equivalent DAGs
+
+### Markov equivalent: ###
+# Have the same skeleton
+# Having the same colliders
 ```
 
 
