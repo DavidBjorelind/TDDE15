@@ -13,8 +13,8 @@ library(ggplot2)
 # If you do not see four arrows in line 16, then do the following:
 # File/Reopen with Encoding/UTF-8
 
-arrows <- c("↑", "→", "↓", "←")
-#arrows <- c("^", ">", "v", "<")
+#arrows <- c("↑", "→", "↓", "←")
+arrows <- c("^", ">", "v", "<")
 action_deltas <- list(c(1,0), # up
                       c(0,1), # right
                       c(-1,0), # down
@@ -159,7 +159,7 @@ q_learning <- function(start_state, epsilon = 0.5, alpha = 0.1, gamma = 0.95,
     state = new_state
     episode_correction = episode_correction + correction
     
-    if(reward!=0)
+    if(reward==10 || reward==-10)
       # End episode.
       return (c(reward,episode_correction))
   }
@@ -269,6 +269,8 @@ for(j in c(0,0.2,0.4,0.66)){ # Different BETAS, EPS = 0.5 (default)
   
   for(i in 1:10000)
     foo <- q_learning(gamma = 0.6, beta = j, start_state = c(1,1))
+  reward <- c(reward,foo[1])
   
   vis_environment(i, gamma = 0.6, beta = j)
 }
+
